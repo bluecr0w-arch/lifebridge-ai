@@ -5,14 +5,15 @@ import styles from "./ResultDisplay.module.css";
 import { AIResponse } from "@/validators/aiSchema";
 import { DecisionState } from "@/core/decisionEngine";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
-import { AlertTriangle, MapPin, Activity, CheckCircle, ShieldAlert, Volume2, Info } from "lucide-react";
+import { AlertTriangle, MapPin, Activity, CheckCircle, ShieldAlert, Volume2, Info, CheckCircle2 } from "lucide-react";
 
 interface ResultDisplayProps {
   response: AIResponse;
   decision: DecisionState;
+  trustScore: number;
 }
 
-export default function ResultDisplay({ response, decision }: ResultDisplayProps) {
+export default function ResultDisplay({ response, decision, trustScore }: ResultDisplayProps) {
   const { speak } = useSpeechSynthesis();
   const [ttsEnabled, setTtsEnabled] = useState(false);
 
@@ -49,9 +50,9 @@ export default function ResultDisplay({ response, decision }: ResultDisplayProps
           <div className={styles.warningBanner}>
               <Info size={24} />
               <div>
-                  <strong>Low Confidence Assessment</strong>
+                  <strong>Inconclusive Assessment - Unreliable Data (Trust Score: {Math.round(trustScore * 100)}%)</strong>
                   <div style={{ fontSize: "0.95rem", opacity: 0.9 }}>
-                      The provided information was vague. Please describe your symptoms in more detail for a more accurate assessment.
+                      The trust score is too low to provide a safe assessment. Please provide more detail (at least 80 chars) and/or a clear photo.
                   </div>
               </div>
           </div>
@@ -60,7 +61,7 @@ export default function ResultDisplay({ response, decision }: ResultDisplayProps
       <div className={styles.card}>
         <div className={styles.header}>
           <div className={styles.headerTitle}>
-            <h2 className={styles.title}>Assessment</h2>
+            <h2 className={styles.title}>Analysis Result</h2>
             <button 
                 onClick={() => {
                     setTtsEnabled(!ttsEnabled);
@@ -81,7 +82,7 @@ export default function ResultDisplay({ response, decision }: ResultDisplayProps
               {response.risk_level} RISK
             </span>
             <span className={styles.confidence}>
-              Confidence: {Math.round(response.confidence * 100)}%
+              <CheckCircle2 size={16} /> Trust Score: {Math.round(trustScore * 100)}%
             </span>
           </div>
         </div>

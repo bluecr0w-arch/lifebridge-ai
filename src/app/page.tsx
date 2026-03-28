@@ -8,6 +8,7 @@ import InputArea from "@/components/InputArea/InputArea";
 import ResultDisplay from "@/components/ResultDisplay/ResultDisplay";
 import { AIResponse } from "@/validators/aiSchema";
 import { DecisionState, evaluateDecision } from "@/core/decisionEngine";
+import { calculateInputQuality, calculateTrustScore } from "@/core/trustEngine";
 import { getFromCache, saveToCache } from "@/utils/cache";
 
 export default function Home() {
@@ -15,13 +16,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AIResponse | null>(null);
   const [decision, setDecision] = useState<DecisionState | null>(null);
+  const [trustScore, setTrustScore] = useState<number>(0);
 
   const handleSubmit = async (text: string, image?: string) => {
-    // 1. Check Cache
+    // 1. Calculate Input Quality Immediately
+    const quality = calculateInputQuality(text, !!image);
+    
+    // 2. Check Cache
     const cached = getFromCache<AIResponse>(text, image);
     if (cached) {
+        const score = calculateTrustScore(cached.confidence, quality, true);
+        setTrustScore(score);
         setResult(cached);
-        setDecision(evaluateDecision(cached));
+        setDecision(evaluateDecision(cached, score));
         return;
     }
 
@@ -45,11 +52,15 @@ export default function Home() {
 
       const aiResponse = data.result as AIResponse;
       
-      // 2. Save to Cache
+      // 3. Calculate Final Trust Score
+      const finalScore = calculateTrustScore(aiResponse.confidence, quality, true);
+      
+      // 4. Save to Cache
       saveToCache(text, image, aiResponse);
       
+      setTrustScore(finalScore);
       setResult(aiResponse);
-      setDecision(evaluateDecision(aiResponse));
+      setDecision(evaluateDecision(aiResponse, finalScore));
     } catch (err: any) {
       console.error(err);
       setError(err.message || "An unexpected error occurred. Please try again or seek emergency care if immediate help is needed.");
@@ -90,7 +101,7 @@ export default function Home() {
           )}
 
           {!loading && result && decision && (
-            <ResultDisplay response={result} decision={decision} />
+            <ResultDisplay response={result} decision={decision} trustScore={trustScore} />
           )}
 
           <div style={{ marginTop: "40px" }}>
