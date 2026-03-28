@@ -145,3 +145,55 @@
   padding: 4px 12px;
   border-radius: 12px;
 }
+
+.warningBanner {
+  background: var(--warning);
+  color: #000;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 32px var(--warning-light);
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ttsBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  color: var(--foreground);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ttsBtn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.ttsBtn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 0 15px var(--glass-glow);
+}
+
+.reasoningText {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(0,0,0,0.1);
+  border-radius: var(--radius-md);
+}

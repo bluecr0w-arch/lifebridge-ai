@@ -91,3 +91,41 @@
 .uploadInput {
   display: none;
 }
+
+.imagePreviewContainer {
+  position: relative;
+  width: fit-content;
+  margin-top: 8px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.imagePreview {
+  max-width: 200px;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.clearImageBtn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease;
+}
+
+.clearImageBtn:hover {
+  transform: scale(1.1);
+}

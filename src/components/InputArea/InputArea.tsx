@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import styles from "./InputArea.module.css";
-import { Mic, Image as ImageIcon, StopCircle, Send } from "lucide-react";
+import { Mic, Image as ImageIcon, StopCircle, Send, X } from "lucide-react";
+import { useVoiceRecognition } from "@/hooks/useVoiceRecognition";
+import { resizeImage } from "@/utils/imageResize";
 
 interface InputAreaProps {
   onSubmit: (text: string, image?: string) => void;
@@ -11,65 +13,33 @@ interface InputAreaProps {
 
 export default function InputArea({ onSubmit, isLoading }: InputAreaProps) {
   const [text, setText] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
   const [image, setImage] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
 
-  useEffect(() => {
-    // Initialize SpeechRecognition if available
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-
-      recognition.onresult = (event: any) => {
-        let currentTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          currentTranscript += event.results[i][0].transcript;
-        }
-        setText((prev) => {
-           // Provide a space if needed
-           const spacer = prev.length > 0 && !prev.endsWith(" ") ? " " : "";
-           return prev + spacer + currentTranscript;
-        });
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
+  // Handle Voice Recognition callback
+  const onVoiceResult = useCallback((newText: string) => {
+    setText((prev) => {
+      const spacer = prev.length > 0 && !prev.endsWith(" ") ? " " : "";
+      return prev + spacer + newText;
+    });
   }, []);
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-        setIsRecording(true);
-      } else {
-        alert("Speech recognition is not supported in this browser.");
-      }
-    }
-  };
+  const { isRecording, toggleRecording } = useVoiceRecognition(onVoiceResult);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
+      reader.onloadend = async () => {
+        const rawBase64 = reader.result as string;
+        try {
+            // Compress image before setting state to save memory and tokens
+            const compressed = await resizeImage(rawBase64);
+            setImage(compressed);
+        } catch (err) {
+            console.error("Image processing failed:", err);
+            setImage(rawBase64);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -90,23 +60,27 @@ export default function InputArea({ onSubmit, isLoading }: InputAreaProps) {
   };
 
   return (
-    <form className={styles.container} onSubmit={handleSubmit}>
+    <form className={styles.container} onSubmit={handleSubmit} aria-label="Symptom Input Form">
       <textarea
         className={styles.textarea}
-        placeholder="Describe your symptoms in detail..."
+        placeholder="Describe your symptoms in detail (e.g., 'Sharp pain in lower back after lifting' or 'Severe headache since morning')..."
         value={text}
         onChange={(e) => setText(e.target.value)}
         disabled={isLoading}
+        aria-required="true"
       />
       
       {image && (
-          <div style={{ position: "relative", width: "fit-content" }}>
-              <img src={image} alt="Uploaded symptom" style={{ maxWidth: "200px", borderRadius: "12px", border: "1px solid var(--glass-border)" }} />
+          <div className={styles.imagePreviewContainer}>
+              <img src={image} alt="Uploaded symptom visual" className={styles.imagePreview} />
               <button 
                   type="button" 
                   onClick={handleClearImage}
-                  style={{ position: "absolute", top: -10, right: -10, background: "var(--danger)", color: "white", borderRadius: "50%", width: 24, height: 24, padding: 0, border: "none", cursor: "pointer" }}
-              >✕</button>
+                  className={styles.clearImageBtn}
+                  aria-label="Remove image"
+              >
+                <X size={16} />
+              </button>
           </div>
       )}
 
@@ -116,7 +90,8 @@ export default function InputArea({ onSubmit, isLoading }: InputAreaProps) {
             type="button"
             className={`${styles.iconBtn} ${isRecording ? styles.recording : ""}`}
             onClick={toggleRecording}
-            title={isRecording ? "Stop recording" : "Start recording"}
+            title={isRecording ? "Stop voice input" : "Start voice input"}
+            aria-pressed={isRecording}
           >
             {isRecording ? <StopCircle size={24} /> : <Mic size={24} />}
           </button>
@@ -125,7 +100,7 @@ export default function InputArea({ onSubmit, isLoading }: InputAreaProps) {
             type="button"
             className={styles.iconBtn}
             onClick={() => fileInputRef.current?.click()}
-            title="Upload image"
+            title="Upload image for visual assessment"
           >
             <ImageIcon size={24} />
           </button>
@@ -144,7 +119,7 @@ export default function InputArea({ onSubmit, isLoading }: InputAreaProps) {
           className={styles.submitBtn}
           disabled={isLoading || (!text.trim() && !image)}
         >
-          {isLoading ? "Processing..." : <><Send size={18} style={{marginRight: 8, verticalAlign: 'middle'}}/> Analyze</>}
+          {isLoading ? "Analyzing..." : <><Send size={18} style={{marginRight: 8, verticalAlign: 'middle'}}/> Analyze Symptoms</>}
         </button>
       </div>
     </form>

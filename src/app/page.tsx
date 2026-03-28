@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import styles from "./page.module.css";
+import Header from "@/components/Header/Header";
+import Disclaimer from "@/components/Disclaimer/Disclaimer";
 import InputArea from "@/components/InputArea/InputArea";
 import ResultDisplay from "@/components/ResultDisplay/ResultDisplay";
-import { AIResponse } from "@/lib/schema";
-import { DecisionState, evaluateDecision } from "@/lib/decisionEngine";
+import { AIResponse } from "@/validators/aiSchema";
+import { DecisionState, evaluateDecision } from "@/core/decisionEngine";
+import { getFromCache, saveToCache } from "@/utils/cache";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -14,6 +17,14 @@ export default function Home() {
   const [decision, setDecision] = useState<DecisionState | null>(null);
 
   const handleSubmit = async (text: string, image?: string) => {
+    // 1. Check Cache
+    const cached = getFromCache<AIResponse>(text, image);
+    if (cached) {
+        setResult(cached);
+        setDecision(evaluateDecision(cached));
+        return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -33,6 +44,10 @@ export default function Home() {
       }
 
       const aiResponse = data.result as AIResponse;
+      
+      // 2. Save to Cache
+      saveToCache(text, image, aiResponse);
+      
       setResult(aiResponse);
       setDecision(evaluateDecision(aiResponse));
     } catch (err: any) {
@@ -44,36 +59,49 @@ export default function Home() {
   };
 
   return (
-    <main className={styles.main}>
-      <div className={styles.brand}>
-        <h1 className={styles.brandTitle}>LifeBridge AI</h1>
-        <p className={styles.brandSubtitle}>
-          Convert real-world symptoms into structured, life-saving medical guidance. 
-          Use text, voice, or image to get an assessment.
-        </p>
-      </div>
-
-      <div className={styles.contentWrapper}>
-        <div className={styles.glassPanel}>
-          <InputArea onSubmit={handleSubmit} isLoading={loading} />
+    <div className={styles.pageContainer}>
+      <Header />
+      
+      <main className={styles.main}>
+        <div className={styles.brand}>
+          <h1 className={styles.brandTitle}>Triage Assistant</h1>
+          <p className={styles.brandSubtitle}>
+            Translate physical distress into structured medical insights. 
+            Analyze symptoms via voice, text, or visual upload.
+          </p>
         </div>
 
-        {error && (
-          <div className={styles.error}>
-            <strong>Error:</strong> {error}
+        <div className={styles.contentWrapper}>
+          <div className={styles.glassPanel}>
+            <InputArea onSubmit={handleSubmit} isLoading={loading} />
           </div>
-        )}
 
-        {loading && (
-          <div className={styles.loading}>
-            <div className={styles.loadingSpinner}></div>
+          {error && (
+            <div className={styles.error} role="alert">
+              <strong>Analysis Error:</strong> {error}
+            </div>
+          )}
+
+          {loading && (
+            <div className={styles.loading}>
+              <div className={styles.loadingSpinner}></div>
+              <p>Analyzing symptoms with Gemini AI...</p>
+            </div>
+          )}
+
+          {!loading && result && decision && (
+            <ResultDisplay response={result} decision={decision} />
+          )}
+
+          <div style={{ marginTop: "40px" }}>
+            <Disclaimer />
           </div>
-        )}
+        </div>
+      </main>
 
-        {!loading && result && decision && (
-          <ResultDisplay response={result} decision={decision} />
-        )}
-      </div>
-    </main>
+      <footer className={styles.pageFooter}>
+        © 2026 LifeBridge AI • Hackathon Edition • Developed for Health & Safety
+      </footer>
+    </div>
   );
 }
