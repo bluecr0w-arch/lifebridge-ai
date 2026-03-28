@@ -16,25 +16,6 @@ export async function POST(req: Request) {
     
     const { text, image } = parseResult.data;
 
-    // --- MOCK FALLBACK FOR TESTING ---
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "AIzaSy...") {
-        const isEmergency = text.toLowerCase().includes("pain") || text.toLowerCase().includes("breathe");
-        const mockResult = {
-            intent: "Symptom Assessment",
-            risk_level: isEmergency ? "HIGH" : "LOW",
-            confidence: 0.85,
-            possible_condition: isEmergency ? "Potential cardiovascular distress (MOCK)" : "General fatigue or mild tension (MOCK)",
-            recommended_actions: isEmergency 
-                ? ["Call 911 immediately", "Stay calm and sit down", "Do not drive yourself to the hospital"]
-                : ["Rest", "Drink plenty of fluids", "Monitor for changes"],
-            urgency: isEmergency ? "CRITICAL" : "LOW"
-        };
-        // Artificial delay to simulate AI
-        await new Promise(r => setTimeout(r, 1500));
-        return NextResponse.json({ result: mockResult });
-    }
-    // --- END MOCK FALLBACK ---
-
     const contents: any[] = [{
        role: "user",
        parts: [{ text: `Assess the following symptoms and determine the appropriate medical response. Symptoms: ${text}` }]
