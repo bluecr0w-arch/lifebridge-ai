@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 import { aiResponseSchema, inputSchema } from "@/validators/aiSchema";
-import { sanitizeInput, isSafeToProcess } from "@/security/sanitizer";
+import { sanitizeInput, classifyInputSafety } from "@/security/sanitizer";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -17,26 +17,29 @@ export async function POST(req: Request) {
     
     const { text, image } = parseResult.data;
 
-    // 2. Sanitize against Injection & Suspect patterns
-    if (!isSafeToProcess(text)) {
-        return NextResponse.json({ error: "Input contains suspicious or invalid patterns." }, { status: 403 });
+    // 2. Classify and Sanitize Input (Early Exit if BLOCKED)
+    const { status, reason } = classifyInputSafety(text);
+    
+    // Log the event for security monitoring
+    if (status !== "SAFE") {
+        console.warn(`[SECURITY EVENT] Input Status: ${status} | Reason: ${reason} | Input: ${text.substring(0, 50)}...`);
+    }
+
+    if (status === "BLOCKED") {
+        return NextResponse.json({ 
+            error: "We could not process your request due to safety or relevance concerns.", 
+            details: reason,
+            safetyStatus: status 
+        }, { status: 403 });
     }
     
     const sanitizedText = sanitizeInput(text);
 
-    // 3. Prepare Prompt for Gemini (Strict context)
+    // 3. Prepare Prompt for Gemini
     const prompt = `
         You are an expert medical triage assistant called LifeBridge AI.
-        Your goal is to assess user-provided symptoms and provide a risk assessment and recommended actions.
-        
         Symptom data: ${sanitizedText}
-        
-        RULES:
-        1. Never provide a final diagnosis. Speak in terms of 'possible conditions' and 'assessment'.
-        2. If the symptoms are vague, set confidence lower.
-        3. If there is chest pain, difficulty breathing, or heavy bleeding, priority must be HIGH.
-        4. Do NOT hallucinate medical advice.
-        5. Return only valid JSON according to the provided schema.
+        Output strictly in JSON.
     `;
 
     const contents: any[] = [{
@@ -47,12 +50,8 @@ export async function POST(req: Request) {
     if (image) {
       const base64Data = image.split(",")[1];
       const mimeType = image.split(";")[0].split(":")[1];
-      
       contents[0].parts.push({
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType
-        }
+        inlineData: { data: base64Data, mimeType: mimeType }
       });
     }
 
@@ -80,11 +79,12 @@ export async function POST(req: Request) {
     const aiOutputText = response.text || "{}";
     
     try {
-        const parsedOutput = JSON.parse(aiOutputText);
-        // Validating the output strongly via Zod against our schema
-        const validatedOutput = aiResponseSchema.parse(parsedOutput);
-        
-        return NextResponse.json({ result: validatedOutput });
+        const validatedOutput = aiResponseSchema.parse(JSON.parse(aiOutputText));
+        // Return results along with safety metadata
+        return NextResponse.json({ 
+            result: validatedOutput,
+            safetyStatus: status 
+        });
     } catch (parseError) {
         console.error("AI output validation failed:", parseError);
         return NextResponse.json({ error: "AI response failed strict validation checks." }, { status: 500 });

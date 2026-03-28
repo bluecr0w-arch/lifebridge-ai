@@ -9,17 +9,26 @@ import ResultDisplay from "@/components/ResultDisplay/ResultDisplay";
 import { AIResponse } from "@/validators/aiSchema";
 import { DecisionState, evaluateDecision } from "@/core/decisionEngine";
 import { calculateInputQuality, calculateTrustScore } from "@/core/trustEngine";
+import { classifyInputSafety } from "@/security/sanitizer"; // Import safety check
 import { getFromCache, saveToCache } from "@/utils/cache";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; details?: string } | null>(null);
   const [result, setResult] = useState<AIResponse | null>(null);
   const [decision, setDecision] = useState<DecisionState | null>(null);
   const [trustScore, setTrustScore] = useState<number>(0);
 
   const handleSubmit = async (text: string, image?: string) => {
-    // 1. Calculate Input Quality Immediately
+    // 1. Pre-Check Safety (Client-side)
+    const safety = classifyInputSafety(text);
+    if (safety.status === "BLOCKED") {
+        setError({ message: "Analysis Blocked", details: safety.reason });
+        setResult(null);
+        return;
+    }
+
+    // 1. Calculate Input Quality
     const quality = calculateInputQuality(text, !!image);
     
     // 2. Check Cache
@@ -63,7 +72,7 @@ export default function Home() {
       setDecision(evaluateDecision(aiResponse, finalScore));
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "An unexpected error occurred. Please try again or seek emergency care if immediate help is needed.");
+      setError({ message: "Analysis Failed", details: err.message });
     } finally {
       setLoading(false);
     }
@@ -75,9 +84,9 @@ export default function Home() {
       
       <main className={styles.main}>
         <div className={styles.brand}>
-          <h1 className={styles.brandTitle}>Triage Assistant</h1>
+          <h1 className={styles.brandTitle}>Medical Triage</h1>
           <p className={styles.brandSubtitle}>
-            Translate physical distress into structured medical insights. 
+            Translate physical symptoms into structured assessment data. 
             Analyze symptoms via voice, text, or visual upload.
           </p>
         </div>
@@ -89,7 +98,7 @@ export default function Home() {
 
           {error && (
             <div className={styles.error} role="alert">
-              <strong>Analysis Error:</strong> {error}
+              <strong>{error.message}:</strong> {error.details}
             </div>
           )}
 
